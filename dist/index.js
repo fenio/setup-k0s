@@ -25718,6 +25718,9 @@ async function stopK0s() {
     // Reset k0s (removes all data and configuration)
     core.info('  Resetting k0s...');
     await exec.exec('sudo', ['k0s', 'reset'], { ignoreReturnCode: true });
+    // Remove k0s binary
+    core.info('  Removing k0s binary...');
+    await exec.exec('sudo', ['rm', '-f', '/usr/local/bin/k0s'], { ignoreReturnCode: true });
     core.info('  k0s cluster stopped and reset');
 }
 
