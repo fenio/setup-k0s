@@ -25686,12 +25686,12 @@ exports.cleanup = cleanup;
 const core = __importStar(__nccwpck_require__(7484));
 const exec = __importStar(__nccwpck_require__(5236));
 async function cleanup() {
-    core.startGroup('Cleaning up k0s');
+    core.startGroup('Cleaning up and restoring system state');
     try {
         core.info('Starting cleanup...');
         // Stop and reset k0s cluster
         await stopK0s();
-        core.info('✓ k0s cleanup complete');
+        core.info('✓ System state restored');
     }
     catch (error) {
         core.warning(`Cleanup encountered errors: ${error}`);
@@ -25769,28 +25769,21 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const main_1 = __nccwpck_require__(1730);
 const cleanup_1 = __nccwpck_require__(2691);
-async function run() {
-    try {
-        const isPost = core.getState('isPost');
-        if (isPost === 'true') {
-            // This is the post-run cleanup phase
-            await (0, cleanup_1.cleanup)();
-        }
-        else {
-            // This is the main setup phase
-            await (0, main_1.main)();
-        }
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            core.setFailed(error.message);
-        }
-        else {
-            core.setFailed(String(error));
-        }
-    }
+// Main entry point
+if (!core.getState('isPost')) {
+    // This is the main run
+    (0, main_1.main)().catch(error => {
+        core.setFailed(error.message);
+        process.exit(1);
+    });
 }
-run();
+else {
+    // This is the post run (cleanup)
+    (0, cleanup_1.cleanup)().catch(error => {
+        core.warning(`Cleanup failed: ${error.message}`);
+        // Don't fail the workflow if cleanup fails
+    });
+}
 
 
 /***/ }),
