@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 
 export async function cleanup(): Promise<void> {
-  core.startGroup('Cleaning up k0s');
+  core.startGroup('Cleaning up and restoring system state');
   
   try {
     core.info('Starting cleanup...');
@@ -10,7 +10,7 @@ export async function cleanup(): Promise<void> {
     // Stop and reset k0s cluster
     await stopK0s();
     
-    core.info('✓ k0s cleanup complete');
+    core.info('✓ System state restored');
   } catch (error) {
     core.warning(`Cleanup encountered errors: ${error}`);
     // Don't fail the workflow if cleanup has issues

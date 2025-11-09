@@ -2,24 +2,17 @@ import * as core from '@actions/core';
 import { main } from './main';
 import { cleanup } from './cleanup';
 
-async function run(): Promise<void> {
-  try {
-    const isPost = core.getState('isPost');
-    
-    if (isPost === 'true') {
-      // This is the post-run cleanup phase
-      await cleanup();
-    } else {
-      // This is the main setup phase
-      await main();
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      core.setFailed(error.message);
-    } else {
-      core.setFailed(String(error));
-    }
-  }
+// Main entry point
+if (!core.getState('isPost')) {
+  // This is the main run
+  main().catch(error => {
+    core.setFailed(error.message);
+    process.exit(1);
+  });
+} else {
+  // This is the post run (cleanup)
+  cleanup().catch(error => {
+    core.warning(`Cleanup failed: ${error.message}`);
+    // Don't fail the workflow if cleanup fails
+  });
 }
-
-run();

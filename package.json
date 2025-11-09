@@ -1,16 +1,24 @@
 {
   "name": "setup-k0s",
   "version": "1.0.0",
-  "description": "GitHub Action to install and configure k0s",
+  "description": "GitHub Action to install and configure k0s with automatic cleanup",
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "format": "prettier --write 'src/**/*.ts'",
+    "lint": "eslint src/**/*.ts",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fenio/setup-k0s.git"
   },
   "keywords": [
-    "github-action",
+    "actions",
     "kubernetes",
-    "k0s"
+    "k0s",
+    "ci",
+    "cd"
   ],
   "author": "fenio",
   "license": "MIT",
@@ -19,7 +27,7 @@
     "@actions/exec": "^1.1.1"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
+    "@types/node": "^24.10.0",
     "@vercel/ncc": "^0.38.4",
     "typescript": "^5.9.3"
   }
