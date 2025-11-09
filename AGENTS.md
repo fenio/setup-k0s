@@ -19,6 +19,7 @@ Every operation in the setup phase has a corresponding cleanup operation:
 | Install k0s binary (`/usr/local/bin/k0s`) | Binary explicitly removed with `rm -f` | `src/cleanup.ts:~46` |
 | Install k0s as controller (`k0s install controller --single`) | Uninstalled by `k0s reset` | `src/cleanup.ts:~42` |
 | Start k0s service (`k0s start`) | Stopped by `k0s stop` | `src/cleanup.ts:~38` |
+| Create CNI directories (`/etc/cni`, `/opt/cni`) | Directories removed with `rm -rf` | `src/cleanup.ts:~49-50` |
 | Create kubeconfig in `~/.kube/config` | Left in place (user home directory) | N/A |
 | Set KUBECONFIG environment variable | No cleanup needed - job-scoped only | N/A |
 

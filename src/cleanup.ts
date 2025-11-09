@@ -45,5 +45,10 @@ async function stopK0s(): Promise<void> {
   core.info('  Removing k0s binary...');
   await exec.exec('sudo', ['rm', '-f', '/usr/local/bin/k0s'], { ignoreReturnCode: true });
   
+  // Remove CNI directories
+  core.info('  Removing CNI directories...');
+  await exec.exec('sudo', ['rm', '-rf', '/etc/cni'], { ignoreReturnCode: true });
+  await exec.exec('sudo', ['rm', '-rf', '/opt/cni'], { ignoreReturnCode: true });
+  
   core.info('  k0s cluster stopped and reset');
 }
