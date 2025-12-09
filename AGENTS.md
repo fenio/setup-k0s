@@ -2,121 +2,57 @@
 
 This file provides comprehensive documentation about the setup-k0s GitHub Action for AI agents and developers working with this codebase.
 
-## ⚠️ CRITICAL PRINCIPLE: SYSTEM STATE RESTORATION ⚠️
-
-**THE MOST IMPORTANT REQUIREMENT OF THIS ACTION:**
-
-This action MUST leave the system in EXACTLY the same state as it was before the action ran. This is a non-negotiable requirement.
-
-### Why This Matters
-GitHub Actions assume that each workflow runs on a pristine Ubuntu fresh install. Any changes made during setup (installing binaries, creating files, starting services) MUST be completely reversed during cleanup. Failure to restore the system state can break subsequent workflows or leave orphaned processes and files.
-
-### What Must Be Restored
-Every operation in the setup phase has a corresponding cleanup operation:
-
-| Setup Operation | Cleanup Operation | Location |
-|----------------|-------------------|----------|
-| Install k0s binary (`/usr/local/bin/k0s`) | Binary explicitly removed with `rm -f` | `src/cleanup.ts:~46` |
-| Install k0s as controller (`k0s install controller --single`) | Uninstalled by `k0s reset` | `src/cleanup.ts:~42` |
-| Start k0s service (`k0s start`) | Stopped by `k0s stop` | `src/cleanup.ts:~38` |
-| Create CNI directories (`/etc/cni`, `/opt/cni`) | Directories removed with `rm -rf` | `src/cleanup.ts:~49-50` |
-| Create kubeconfig in `~/.kube/config` | Left in place (user home directory) | N/A |
-| Set KUBECONFIG environment variable | No cleanup needed - job-scoped only | N/A |
-
-### Cleanup Guarantees
-- Cleanup runs automatically via GitHub Actions `post:` hook - it ALWAYS runs, even if the workflow fails
-- Cleanup is non-failing (`ignoreReturnCode: true`) to ensure it completes even if some operations encounter errors
-- The `k0s reset` command removes all data, configuration, and the systemd service
-
-### When Making Changes
-**BEFORE adding any new setup operation, you MUST add the corresponding cleanup operation.**
-
-If you:
-- Create a file → Delete it in cleanup
-- Modify a config → Restore original in cleanup
-- Stop a service → Restart it in cleanup
-- Install a package → Uninstall it in cleanup
-
-**Violating this principle will break other workflows and is unacceptable.**
-
----
-
 ## Project Overview
 
-**setup-k0s** is a GitHub Action that installs and configures k0s - Zero Friction Kubernetes. The action handles both setup and automatic cleanup/restoration of the system state.
+**setup-k0s** is a GitHub Action that installs and configures k0s - Zero Friction Kubernetes. The action is implemented as a simple bash composite action with no external dependencies.
 
 ### Key Features
 - Automatic installation of k0s with version selection
 - Single-node controller setup for CI/CD pipelines
 - Cluster readiness checks with configurable timeout
-- **Automatic post-run cleanup and complete system restoration** (MOST IMPORTANT FEATURE)
 - Outputs kubeconfig path for easy integration with kubectl
+- Simple bash implementation with no build step required
 
 ## Architecture
 
-### Entry Point Flow
-The action uses GitHub Actions' `post:` hook mechanism for automatic cleanup:
+The action uses GitHub Actions' **composite** run type, which allows it to execute shell scripts directly without requiring Node.js or any compilation step.
 
-1. **Main Run** (`src/index.ts`): Entry point that routes to either main or cleanup based on state
-2. **Setup Phase** (`src/main.ts`): Handles k0s installation and configuration
-3. **Cleanup Phase** (`src/cleanup.ts`): Automatically runs after job completion for restoration
-
-### Execution Phases
-
-#### Phase 1: Setup (src/main.ts)
+### Execution Flow
 
 ```
-installK0s() → startK0s() → waitForClusterReady()
+Install k0s → Start k0s → Wait for Cluster Ready (optional)
 ```
 
-**installK0s(version)**
-- Resolves 'latest' version or uses specified version
+**Install k0s**
 - Detects system architecture (amd64/arm64/arm)
+- Resolves 'latest' version or uses specified version from GitHub releases
 - Downloads k0s binary from GitHub releases
 - Installs binary to `/usr/local/bin/k0s`
-- Location: `src/main.ts:38-112`
+- Location: `action.yml:33-82`
 
-**startK0s()**
+**Start k0s**
 - Installs k0s as a controller service with `--single` flag
 - Starts k0s service
-- Waits for kubeconfig generation
+- Waits for kubeconfig generation (10 second sleep)
 - Extracts kubeconfig from k0s and writes to `~/.kube/config`
 - Sets KUBECONFIG output and environment variable
-- Location: `src/main.ts:114-165`
+- Location: `action.yml:84-108`
 
-**waitForClusterReady(timeout)**
+**Wait for Cluster Ready** (optional)
 - Polls for cluster readiness with configurable timeout
 - Checks: k0s status → kubectl connects → nodes Ready → kube-system pods running
 - Shows diagnostics if timeout occurs
-- Location: `src/main.ts:167-247`
-
-#### Phase 2: Cleanup (src/cleanup.ts)
-
-```
-stopK0s()
-```
-
-**stopK0s()**
-- Checks if k0s is installed
-- Stops k0s service with `k0s stop`
-- Resets k0s with `k0s reset` (removes all data, configuration, and systemd service)
-- Location: `src/cleanup.ts:22-45`
+- Location: `action.yml:110-182`
 
 ## File Structure
 
 ```
 setup-k0s/
-├── src/
-│   ├── index.ts         # Entry point - routes to main or cleanup
-│   ├── main.ts          # Setup phase implementation
-│   └── cleanup.ts       # Cleanup phase implementation
-├── dist/                # Compiled JavaScript (via @vercel/ncc)
-│   ├── index.js         # Bundled main entry point
-│   └── *.map            # Source maps
-├── action.yml           # GitHub Action metadata and interface
-├── package.json         # Node.js dependencies and scripts
-├── tsconfig.json        # TypeScript configuration
-└── AGENTS.md            # This file
+├── action.yml           # Complete action definition and bash implementation
+├── README.md            # User-facing documentation
+├── AGENTS.md            # This file
+├── LICENSE              # MIT License
+└── CHANGELOG.md         # Version history
 ```
 
 ## Key Technical Details
@@ -132,51 +68,16 @@ setup-k0s/
 - `kubeconfig`: Path to kubeconfig file (`~/.kube/config`)
 
 **Runtime:**
-- Node.js 24 (`node24`)
-- Main entry: `dist/index.js`
-- Post hook: `dist/index.js` (same file, different execution path)
+- Composite action using bash shell
+- No build step required
+- No external dependencies
 
 ### Dependencies
 
-**Production:**
-- `@actions/core`: GitHub Actions toolkit for inputs/outputs/logging
-- `@actions/exec`: Execute shell commands
-
-**Development:**
-- `@vercel/ncc`: Compiles TypeScript and bundles dependencies into single file
-- `typescript`: TypeScript compiler
-
-### Build Process
-
-```bash
-npm run build  # Uses @vercel/ncc to create dist/index.js
-```
-
-**Important:** The `dist/` directory must be committed to the repository for the action to work, as GitHub Actions cannot run build steps before execution.
-
-## State Management
-
-The action uses `core.saveState()` and `core.getState()` to coordinate between main and cleanup phases:
-
-```typescript
-// src/main.ts - Set state during main run
-core.saveState('isPost', 'true');
-
-// src/index.ts - Check state to determine phase
-if (!core.getState('isPost')) {
-  // Main run
-  main()
-} else {
-  // Post run (cleanup)
-  cleanup()
-}
-```
-
-## System Requirements
-
-- **OS:** Linux (tested on ubuntu-latest)
-- **Permissions:** sudo access (available by default in GitHub Actions)
-- **Network:** Internet access to download k0s releases
+**None!** This action has no dependencies. It uses only:
+- Standard bash shell commands
+- `curl` for downloading k0s
+- `kubectl` (installed by k0s itself)
 
 ## Common Modification Scenarios
 
@@ -191,39 +92,83 @@ inputs:
     default: 'default-value'
 ```
 
-2. Read input in `src/main.ts`:
-```typescript
-const newOption = core.getInput('new-option');
+2. Use the input in the bash script section:
+```bash
+NEW_OPTION="${{ inputs.new-option }}"
 ```
 
 3. Update README.md documentation
 
 ### Modifying Installation Logic
 
-The installation logic is in `src/main.ts:38-112`. Key areas:
-- Version resolution: lines 74-84
-- Architecture detection: lines 44-68
-- Binary download and installation: lines 86-100
+The installation logic is in `action.yml:33-82`. Key areas:
+- Architecture detection: lines 41-57
+- Version resolution: lines 61-68
+- Binary download and installation: lines 70-78
 
-### Adjusting Cleanup Behavior
+### Adjusting Cluster Startup
 
-**CRITICAL:** Cleanup logic is in `src/cleanup.ts`. The cleanup is designed to be non-failing (uses `ignoreReturnCode: true`) to avoid breaking workflows if cleanup encounters issues.
+The startup logic is in `action.yml:84-108`. You can modify:
+- Installation flags: line 92 (`--single` flag can be changed for different topologies)
+- Wait time for kubeconfig: line 99 (currently 10 seconds)
+- Kubeconfig location: line 102 (currently `~/.kube/config`)
 
-**MANDATORY RULE:** Every modification to setup logic MUST have a corresponding cleanup operation. Review the "CRITICAL PRINCIPLE: SYSTEM STATE RESTORATION" section at the top of this document before making any changes.
+### Customizing Readiness Checks
+
+The readiness check logic is in `action.yml:110-182`. You can:
+- Change polling interval: line 175 (currently 5 seconds)
+- Modify readiness conditions: lines 147-167
+- Add/remove diagnostic commands: lines 135-145
 
 ## Testing Strategy
 
+### Local Testing
+You can test the bash script locally by copying the shell commands from `action.yml` and running them with appropriate variable substitutions:
+
+```bash
+export VERSION="latest"
+export WAIT_FOR_READY="true"
+export TIMEOUT="300"
+
+# Then run the commands from action.yml
+```
+
+### Testing in GitHub Actions
+Create a workflow in `.github/workflows/test.yml`:
+
+```yaml
+name: Test Action
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          version: 'latest'
+          wait-for-ready: 'true'
+          timeout: '300'
+      - name: Test kubectl
+        run: kubectl get nodes
+```
+
 ### Testing Checklist
 **Setup Phase:**
-- [ ] k0s installs successfully
+- [ ] k0s installs successfully for different versions
+- [ ] Works on different architectures (amd64, arm64)
 - [ ] Cluster becomes ready within timeout
 - [ ] kubectl can connect and list nodes
+- [ ] kubeconfig output is set correctly
+- [ ] KUBECONFIG environment variable is exported
 
-**Cleanup Phase (CRITICAL - MUST VERIFY):**
-- [ ] Cleanup removes ALL k0s files
-- [ ] k0s service is stopped and removed
-- [ ] No leftover processes or sockets
-- [ ] No orphaned systemd services remain
+## System Requirements
+
+- **OS:** Linux (tested on ubuntu-latest in GitHub Actions)
+- **Permissions:** sudo access (available by default in GitHub Actions)
+- **Network:** Internet access to download k0s releases
+- **Pre-installed tools:** bash, curl, sudo
 
 ## Debugging
 
@@ -231,37 +176,63 @@ The installation logic is in `src/main.ts:38-112`. Key areas:
 Set repository secret: `ACTIONS_STEP_DEBUG = true`
 
 ### Key Log Messages
-- "Starting k0s setup..." - Main phase begins
-- "k0s installed successfully" - Installation complete
-- "k0s cluster is fully ready!" - Cluster ready
-- "Starting cleanup..." - Cleanup phase begins
-- "k0s cluster stopped and reset" - Cleanup complete
+- "Starting k0s setup..." - Setup begins
+- "✓ k0s installed successfully" - Installation complete
+- "✓ k0s cluster started successfully" - Cluster started
+- "✓ k0s cluster is fully ready!" - Cluster ready
+- "✓ k0s setup completed successfully!" - Complete
 
 ### Diagnostic Information
-When cluster readiness times out, `showDiagnostics()` (`src/main.ts:249-271`) displays:
+When cluster readiness times out, diagnostics are automatically displayed:
 - k0s status
 - k0scontroller journal logs (last 100 lines)
 - Kubectl cluster info
 - Nodes status
 - Kube-system pods
 
+### Common Issues
+
+**Issue:** "Timeout waiting for cluster to be ready"
+- Check the diagnostic logs printed automatically
+- Ensure the runner has sufficient resources
+- Consider increasing the timeout value
+
+**Issue:** "Unsupported architecture"
+- Currently supports: x86_64 (amd64), aarch64/arm64, armv7l (arm)
+- Check if k0s releases support your architecture
+
+**Issue:** "Failed to download k0s"
+- Check network connectivity
+- Verify the version exists in GitHub releases
+- Check if rate limiting is affecting the download
+
 ## Related Resources
 
 - **k0s Project**: https://k0sproject.io/
 - **k0s GitHub**: https://github.com/k0sproject/k0s
 - **GitHub Actions Documentation**: https://docs.github.com/actions
-- **Node.js Actions Guide**: https://docs.github.com/actions/creating-actions/creating-a-javascript-action
+- **Composite Actions Guide**: https://docs.github.com/actions/creating-actions/creating-a-composite-action
 
 ## Contributing
 
 ### Development Workflow
-1. Make changes to `src/*.ts`
-2. **CRITICAL:** If modifying setup phase, add corresponding cleanup operations
-3. Run `npm run build` to compile
-4. Commit both `src/` and `dist/` changes
-5. Test in a workflow on GitHub - verify BOTH setup AND cleanup work correctly
-6. Test that subsequent workflows still work after your action runs
-7. Create pull request
+1. Make changes to `action.yml`
+2. Test locally or in a GitHub Actions workflow
+3. Update README.md if adding/changing inputs or outputs
+4. Update CHANGELOG.md with your changes
+5. Create pull request
 
 ### Release Process
-Releases are typically managed via tags. Tags should follow semantic versioning (e.g., v1.0.0).
+Releases are managed via tags following semantic versioning (e.g., v1.0.0).
+
+To create a new release:
+1. Update CHANGELOG.md
+2. Create and push a new tag: `git tag v1.x.x && git push origin v1.x.x`
+3. Create a GitHub release from the tag
+
+### Code Style
+- Use 2-space indentation for YAML
+- Use 2-space indentation for bash
+- Add comments for complex logic
+- Keep error messages clear and actionable
+- Use `set -e` to fail fast on errors
