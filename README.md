@@ -42,7 +42,7 @@ jobs:
 |-------|-------------|---------|
 | `version` | k0s version to install (e.g., `v1.30.0+k0s.0`) or `latest` | `latest` |
 | `wait-for-ready` | Wait for cluster to be ready before completing | `true` |
-| `timeout` | Timeout in seconds to wait for cluster readiness | `300` |
+| `timeout` | Timeout in seconds to wait for cluster readiness | `120` |
 
 ## Outputs
 
@@ -127,16 +127,18 @@ You can add a step to check the k0s status:
 
 ## Development
 
-This action is written in TypeScript and compiled to JavaScript using `@vercel/ncc`.
+This action is implemented as a pure bash script (`setup.sh`) with no build step required.
 
-### Building
+### Testing
 
-```bash
-npm install
-npm run build
-```
+To test changes locally:
 
-The compiled output in `dist/` must be committed to the repository for the action to work.
+1. Fork and clone the repository
+2. Make your changes to `action.yml` or `setup.sh`
+3. Create a test workflow that uses your local action (`uses: ./`)
+4. Push to your fork and verify the workflow runs successfully
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## License
 

@@ -26,7 +26,7 @@ jobs:
         with:
           version: 'latest'
           wait-for-ready: 'true'
-          timeout: '300'
+          timeout: '120'
       
       - name: Verify k0s is installed and running
         run: |
@@ -108,7 +108,7 @@ jobs:
         uses: ./
         with:
           version: 'latest'
-          timeout: '300'
+          timeout: '120'
         
       - name: Verify second k0s instance works
         env:
