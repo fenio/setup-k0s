@@ -4,15 +4,15 @@ set -e
 echo "::group::Installing k0s"
 echo "Starting k0s setup..."
 
-VERSION="${INPUT_VERSION}"
-WAIT_FOR_READY="${INPUT_WAIT_FOR_READY}"
-TIMEOUT="${INPUT_TIMEOUT}"
+VERSION="$INPUT_VERSION"
+WAIT_FOR_READY="$INPUT_WAIT_FOR_READY"
+TIMEOUT="$INPUT_TIMEOUT"
 
-echo "Configuration: version=${VERSION}, wait-for-ready=${WAIT_FOR_READY}, timeout=${TIMEOUT}s"
+echo "Configuration: version=$VERSION, wait-for-ready=$WAIT_FOR_READY, timeout=${TIMEOUT}s"
 
 # Detect architecture
 ARCH=$(uname -m)
-case ${ARCH} in
+case "$ARCH" in
   x86_64)
     BINARY_ARCH="amd64"
     ;;
@@ -23,27 +23,27 @@ case ${ARCH} in
     BINARY_ARCH="arm"
     ;;
   *)
-    echo "::error::Unsupported architecture: ${ARCH}"
+    echo "::error::Unsupported architecture: $ARCH"
     exit 1
     ;;
 esac
 
-echo "Architecture: ${ARCH} -> ${BINARY_ARCH}"
+echo "Architecture: $ARCH -> $BINARY_ARCH"
 
 # Resolve version if 'latest'
-ACTUAL_VERSION="${VERSION}"
-if [ "${VERSION}" = "latest" ]; then
+ACTUAL_VERSION="$VERSION"
+if [ "$VERSION" = "latest" ]; then
   echo "Resolving latest version..."
   ACTUAL_VERSION=$(curl -sL https://api.github.com/repos/k0sproject/k0s/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-  echo "Latest version: ${ACTUAL_VERSION}"
+  echo "Latest version: $ACTUAL_VERSION"
 fi
 
 # Construct download URL
-DOWNLOAD_URL="https://github.com/k0sproject/k0s/releases/download/${ACTUAL_VERSION}/k0s-${ACTUAL_VERSION}-${BINARY_ARCH}"
-echo "Downloading from: ${DOWNLOAD_URL}"
+DOWNLOAD_URL="https://github.com/k0sproject/k0s/releases/download/$ACTUAL_VERSION/k0s-$ACTUAL_VERSION-$BINARY_ARCH"
+echo "Downloading from: $DOWNLOAD_URL"
 
 # Download and install binary
-curl -sfL "${DOWNLOAD_URL}" -o /tmp/k0s
+curl -sfL "$DOWNLOAD_URL" -o /tmp/k0s
 sudo install /tmp/k0s /usr/local/bin/k0s
 rm -f /tmp/k0s
 
@@ -74,15 +74,15 @@ echo "Extracting kubeconfig..."
 sudo k0s kubeconfig admin > ~/.kube/config
 chmod 600 ~/.kube/config
 
-KUBECONFIG_PATH="${HOME}/.kube/config"
-echo "kubeconfig=${KUBECONFIG_PATH}" >> $GITHUB_OUTPUT
-echo "KUBECONFIG=${KUBECONFIG_PATH}" >> $GITHUB_ENV
-echo "KUBECONFIG exported: ${KUBECONFIG_PATH}"
+KUBECONFIG_PATH="$HOME/.kube/config"
+echo "kubeconfig=$KUBECONFIG_PATH" >> "$GITHUB_OUTPUT"
+echo "KUBECONFIG=$KUBECONFIG_PATH" >> "$GITHUB_ENV"
+echo "KUBECONFIG exported: $KUBECONFIG_PATH"
 echo "✓ k0s cluster started successfully"
 echo "::endgroup::"
 
 # Wait for cluster ready (if requested)
-if [ "${WAIT_FOR_READY}" = "true" ]; then
+if [ "$WAIT_FOR_READY" = "true" ]; then
   echo "::group::Waiting for cluster ready"
   echo "Waiting for k0s cluster to be ready (timeout: ${TIMEOUT}s)..."
   
@@ -91,7 +91,7 @@ if [ "${WAIT_FOR_READY}" = "true" ]; then
   while true; do
     ELAPSED=$(($(date +%s) - START_TIME))
     
-    if [ ${ELAPSED} -gt ${TIMEOUT} ]; then
+    if [ "$ELAPSED" -gt "$TIMEOUT" ]; then
       echo "::error::Timeout waiting for cluster to be ready"
       echo "::group::Diagnostic Information"
       echo "=== k0s Status ==="
@@ -137,7 +137,7 @@ if [ "${WAIT_FOR_READY}" = "true" ]; then
       echo "k0s not running yet"
     fi
     
-    echo "Cluster not ready yet, waiting... (${ELAPSED}/${TIMEOUT}s)"
+    echo "Cluster not ready yet, waiting... ($ELAPSED/${TIMEOUT}s)"
     sleep 5
   done
   
