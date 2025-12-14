@@ -4,6 +4,50 @@ set -e
 echo "::group::Installing k0s"
 echo "Starting k0s setup..."
 
+# Remove existing container runtimes (required by KubeSolo)
+echo "Removing existing container runtimes..."
+
+# Stop services
+sudo systemctl stop docker docker.socket containerd podman 2>/dev/null || true
+sudo systemctl disable docker docker.socket containerd podman 2>/dev/null || true
+
+# Kill any remaining processes
+sudo pkill -9 dockerd 2>/dev/null || true
+sudo pkill -9 containerd 2>/dev/null || true
+sudo pkill -9 podman 2>/dev/null || true
+
+# Rename binaries instead of uninstalling (much faster)
+for bin in docker dockerd containerd containerd-shim containerd-shim-runc-v2 runc podman; do
+  if [ -f "/usr/bin/$bin" ]; then
+    sudo mv "/usr/bin/$bin" "/usr/bin/${bin}.bak"
+  fi
+done
+
+# Remove data directories and sockets
+sudo rm -rf /var/lib/docker /var/lib/containerd
+sudo rm -f /var/run/docker.sock /var/run/containerd/containerd.sock
+
+# Remove docker0 network interface
+sudo ip link set docker0 down 2>/dev/null || true
+sudo ip link delete docker0 2>/dev/null || true
+
+# Flush ALL iptables rules (nuclear option - required for clean KubeSolo networking)
+# This removes everything including Docker rules that interfere with KubeSolo's CNI
+echo "Flushing all iptables rules..."
+sudo iptables -F
+sudo iptables -X
+sudo iptables -t nat -F
+sudo iptables -t nat -X
+sudo iptables -t mangle -F
+sudo iptables -t mangle -X
+sudo iptables -t raw -F
+sudo iptables -t raw -X
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -P OUTPUT ACCEPT
+
+echo "✓ Container runtimes removed"
+
 # Read inputs
 VERSION="${INPUT_VERSION:-latest}"
 WAIT_FOR_READY="${INPUT_WAIT_FOR_READY:-true}"
