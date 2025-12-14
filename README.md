@@ -26,7 +26,7 @@ jobs:
       
       - name: Setup k0s
         id: k0s
-        uses: fenio/setup-k0s@v1
+        uses: fenio/setup-k0s@v2
       
       - name: Deploy and test
         run: |
@@ -43,6 +43,7 @@ jobs:
 | `version` | k0s version to install (e.g., `v1.30.0+k0s.0`) or `latest` | `latest` |
 | `wait-for-ready` | Wait for cluster to be ready before completing | `true` |
 | `timeout` | Timeout in seconds to wait for cluster readiness | `120` |
+| `dns-readiness` | Wait for CoreDNS to be ready and verify DNS resolution works | `true` |
 
 ## Outputs
 
