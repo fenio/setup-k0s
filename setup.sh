@@ -4,9 +4,10 @@ set -e
 echo "::group::Installing k0s"
 echo "Starting k0s setup..."
 
-VERSION="$INPUT_VERSION"
-WAIT_FOR_READY="$INPUT_WAIT_FOR_READY"
-TIMEOUT="$INPUT_TIMEOUT"
+# Read inputs
+VERSION="${INPUT_VERSION:-latest}"
+WAIT_FOR_READY="${INPUT_WAIT_FOR_READY:-true}"
+TIMEOUT="${INPUT_TIMEOUT:-120}"
 
 echo "Configuration: version=$VERSION, wait-for-ready=$WAIT_FOR_READY, timeout=${TIMEOUT}s"
 
@@ -137,7 +138,7 @@ if [ "$WAIT_FOR_READY" = "true" ]; then
       echo "k0s not running yet"
     fi
     
-    echo "Cluster not ready yet, waiting... ($ELAPSED/${TIMEOUT}s)"
+    echo "Cluster not ready yet, waiting... (${ELAPSED}/${TIMEOUT}s)"
     sleep 5
   done
   
