@@ -2,75 +2,76 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  test-k0s-functionality:
+  test:
     runs-on: ubuntu-latest
-    name: Test k0s Functionality
-    
+    name: Test k0s
+
     steps:
-      - uses: actions/checkout@v6
-      
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Check initial state
         run: |
-          echo "=== Checking Initial System State ==="
-          ! which k0s && echo "✓ k0s not installed initially" || (echo "✗ k0s already installed" && exit 1)
-          
+          echo "=== Checking initial system state ==="
+          if command -v k0s &> /dev/null; then
+            echo "✗ k0s already installed"
+            exit 1
+          fi
+          echo "✓ k0s not installed"
+
       - name: Setup k0s
-        id: k0s
+        id: setup
         uses: ./
         with:
           version: 'latest'
           wait-for-ready: 'true'
           timeout: '120'
-      
-      - name: Verify k0s is installed and running
+
+      - name: Verify installation
         run: |
-          echo "=== Verifying k0s Installation ==="
-          which k0s && echo "✓ k0s binary found at $(which k0s)" || (echo "✗ k0s binary not found" && exit 1)
-          sudo k0s status && echo "✓ k0s is running" || (echo "✗ k0s not running" && exit 1)
-      
+          echo "=== Verifying installation ==="
+          command -v k0s && echo "✓ k0s binary found" || { echo "✗ k0s binary not found"; exit 1; }
+          sudo k0s status && echo "✓ k0s is running" || { echo "✗ k0s not running"; exit 1; }
+
       - name: Test kubectl access
         env:
-          KUBECONFIG: ${{ steps.k0s.outputs.kubeconfig }}
+          KUBECONFIG: ${{ steps.setup.outputs.kubeconfig }}
         run: |
-          echo "=== Testing Kubernetes Functionality ==="
+          echo "=== Testing kubectl access ==="
           kubectl version --client
           kubectl cluster-info
           kubectl get nodes -o wide
           kubectl get pods -A
-          
+
       - name: Deploy test workload
         env:
-          KUBECONFIG: ${{ steps.k0s.outputs.kubeconfig }}
+          KUBECONFIG: ${{ steps.setup.outputs.kubeconfig }}
         run: |
-          echo "=== Deploying Test Workload ==="
-          
+          echo "=== Deploying test workload ==="
           kubectl create deployment nginx --image=nginx:alpine
           kubectl expose deployment nginx --port=80 --type=ClusterIP
           kubectl wait --for=condition=available --timeout=120s deployment/nginx
-          
-          # Test connectivity
+
           POD_NAME=$(kubectl get pod -l app=nginx -o jsonpath='{.items[0].metadata.name}')
-          kubectl exec $POD_NAME -- wget -O- http://localhost:80 | grep -q "Welcome to nginx"
+          kubectl exec "$POD_NAME" -- wget -O- http://localhost:80 | grep -q "Welcome to nginx"
           echo "✓ Workload is functioning correctly"
-      
-      - name: Test internet connectivity from pod
+
+      - name: Test pod networking
         env:
-          KUBECONFIG: ${{ steps.k0s.outputs.kubeconfig }}
+          KUBECONFIG: ${{ steps.setup.outputs.kubeconfig }}
         run: |
-          echo "=== Testing Internet Connectivity from Pod ==="
-          
+          echo "=== Testing pod networking ==="
           kubectl run connectivity-test --image=busybox:stable --restart=Never -- sleep 300
           kubectl wait --for=condition=ready --timeout=60s pod/connectivity-test
-          
-          # Test DNS resolution and external connectivity
+
           kubectl exec connectivity-test -- nslookup google.com
           kubectl exec connectivity-test -- wget -q -O- --timeout=10 http://ifconfig.me && echo ""
-          echo "✓ Internet connectivity from pod is working"
-          
+          echo "✓ Pod networking is working"
+
           kubectl delete pod connectivity-test --ignore-not-found
