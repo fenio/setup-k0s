@@ -158,7 +158,7 @@ if [ "$DNS_READINESS" = "true" ]; then
   echo "✓ CoreDNS is ready"
   
   # Create a test pod and verify DNS resolution
-  kubectl run dns-test --image=busybox:stable --restart=Never -- sleep 300
+  kubectl run dns-test --image=public.ecr.aws/docker/library/busybox:stable --restart=Never -- sleep 300
   kubectl wait --for=condition=ready --timeout=60s pod/dns-test
   
   if kubectl exec dns-test -- nslookup kubernetes.default.svc.cluster.local; then
