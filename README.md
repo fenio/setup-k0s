@@ -9,7 +9,7 @@ A GitHub Action for installing and configuring [k0s](https://k0sproject.io/) - Z
 - ✅ Configurable version
 - ✅ Waits for cluster readiness
 - ✅ Outputs kubeconfig path for easy integration
-- ✅ **Automatic cleanup** - Resets the cluster after your workflow completes
+- ✅ No cleanup required - designed for ephemeral GitHub Actions runners
 
 ## Quick Start
 
@@ -32,8 +32,6 @@ jobs:
         run: |
           kubectl apply -f k8s/
           kubectl wait --for=condition=available --timeout=60s deployment/my-app
-      
-      # Cleanup happens automatically after this job completes!
 ```
 
 ## Inputs
@@ -57,14 +55,14 @@ jobs:
 
 ```yaml
 - name: Setup k0s
-  uses: fenio/setup-k0s@v1
+  uses: fenio/setup-k0s@v2
 ```
 
 ### Specific Version
 
 ```yaml
 - name: Setup k0s
-  uses: fenio/setup-k0s@v1
+  uses: fenio/setup-k0s@v2
   with:
     version: 'v1.30.0+k0s.0'
 ```
@@ -73,27 +71,20 @@ jobs:
 
 ```yaml
 - name: Setup k0s
-  uses: fenio/setup-k0s@v1
+  uses: fenio/setup-k0s@v2
   with:
     timeout: '600'  # 10 minutes
 ```
 
 ## How It Works
 
-### Setup Phase
 1. Installs the k0s binary for your platform
 2. Installs k0s as a single-node controller using systemd
 3. Starts the k0s service
 4. Extracts and configures kubectl with the admin kubeconfig
 5. Waits for the cluster to become ready (if `wait-for-ready` is enabled)
 
-### Automatic Cleanup (Post-run)
-After your workflow steps complete (whether successful or failed), the action automatically:
-1. Stops the k0s service
-2. Resets k0s (removes all data and configuration)
-3. Cleans up all cluster resources
-
-This is achieved using GitHub Actions' `post:` hook, similar to how `actions/checkout` cleans up after itself.
+**No cleanup needed** - GitHub Actions runners are ephemeral and destroyed after each workflow run, so there's no need to restore system state.
 
 ## Requirements
 
@@ -109,7 +100,7 @@ If the cluster doesn't become ready in time, increase the timeout:
 
 ```yaml
 - name: Setup k0s
-  uses: fenio/setup-k0s@v1
+  uses: fenio/setup-k0s@v2
   with:
     timeout: '600'  # 10 minutes
 ```
@@ -148,6 +139,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Related Projects
 
 - [k0s](https://k0sproject.io/) - Zero Friction Kubernetes
+
+### Other Kubernetes Setup Actions
+
 - [setup-k3s](https://github.com/fenio/setup-k3s) - Lightweight Kubernetes (k3s)
 - [setup-kubesolo](https://github.com/fenio/setup-kubesolo) - Ultra-lightweight Kubernetes
+- [setup-microk8s](https://github.com/fenio/setup-microk8s) - Lightweight Kubernetes by Canonical
 - [setup-minikube](https://github.com/fenio/setup-minikube) - Local Kubernetes (Minikube)
+- [setup-talos](https://github.com/fenio/setup-talos) - Secure, immutable Kubernetes OS (Talos)
